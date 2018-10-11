@@ -1,0 +1,12 @@
+[package]
+name = "makepass"
+version = "0.1.0"
+authors = ["Nathan West <Lucretiel@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.32.0"
+
+[dependencies.structopt]
+version = "0.2.11"
+features = ["color", "suggestions"]
