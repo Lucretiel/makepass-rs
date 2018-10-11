@@ -4,9 +4,9 @@ use clap::{arg_enum, _clap_count_exprs};
 arg_enum!{
 	#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 	enum NewlineBehavior {
-		Never,
-		Always,
-		Auto,
+		never,
+		always,
+		auto,
 	}
 }
 
@@ -97,9 +97,9 @@ struct Opt {
 	#[structopt(short="v", long="verbose")]
 	verbose: bool,
 
-	/// Trailing newline behavior for the password. One of "always", "auto", "never". If "auto",
+	/// Trailing newline behavior for the password. If "auto",
 	/// a trailing newline will be printed iff stdout is detected to be a tty.
-	#[structopt(long="newline", default_value="auto")]
+	#[structopt(long="newline", default_value="auto", raw(possible_values="&NewlineBehavior::variants()"))]
 	newline: NewlineBehavior,
 }
 
