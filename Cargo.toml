@@ -5,8 +5,10 @@ authors = ["Nathan West <Lucretiel@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.32.0"
+structopt = "0.2"
+rand = "0.6"
+phf = "0.7"
 
-[dependencies.structopt]
-version = "0.2.11"
-features = ["color", "suggestions"]
+[build-dependencies]
+phf_codegen = { git = "https://github.com/Lucretiel/rust-phf", branch = "display-impl"}
+joinery = "2.0"
