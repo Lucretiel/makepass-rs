@@ -69,6 +69,11 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "lazy_format"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "libc"
 version = "0.2.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -78,6 +83,7 @@ name = "makepass"
 version = "0.1.0"
 dependencies = [
  "joinery 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_format 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "phf_codegen 0.7.24 (git+https://github.com/Lucretiel/rust-phf?branch=display-impl)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -387,6 +393,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum joinery 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "85a5c968b1e8336a945da21fab473045df2d5f8c81535e762d52f6b2c49477b9"
+"checksum lazy_format 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d02b2c1dae116c4991953ec73c76bc0da109a86cee8c84ca584beb17a4479652"
 "checksum libc 0.2.48 (registry+https://github.com/rust-lang/crates.io-index)" = "e962c7641008ac010fa60a7dfdc1712449f29c44ef2d4702394aea943ee75047"
 "checksum phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "b3da44b85f8e8dfaec21adae67f95d93244b2ecf6ad2a692320598dcc8e6dd18"
 "checksum phf_codegen 0.7.24 (git+https://github.com/Lucretiel/rust-phf?branch=display-impl)" = "<none>"

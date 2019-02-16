@@ -35,7 +35,7 @@ struct NewlineBehaviorParseError;
 enum NewlineBehavior {
     Never,
     Always,
-    Auto
+    Auto,
 }
 
 impl FromStr for NewlineBehavior {
@@ -101,7 +101,7 @@ struct Opt {
 
     /// The set of symbols to choose from when appending a random symbol.
     ///
-    /// Defaults to !"#$%&'()*+,-./\:;<=>?@[]^_`{|}~
+    /// Implies --append_symbol. Defaults to !"#$%&'()*+,-./\:;<=>?@[]^_`{|}~
     #[structopt(short = "S", long = "symbol-set", requires = "append_symbol")]
     symbol_set: Option<String>,
 
@@ -166,7 +166,8 @@ struct Opt {
         default_value = "auto",
         possible_value = "never",
         possible_value = "always",
-        possible_value = "auto")]
+        possible_value = "auto"
+    )]
     newline: NewlineBehavior,
 }
 
@@ -207,10 +208,12 @@ impl Opt {
         !self.no_append_numeral
     }
 
-    // Return the set of symbols to chose from, iff --append-symbol was given
+    /// If a symbol should be appended, return the set of symbols to choose from.
     fn append_symbol(&self) -> Option<&str> {
         if self.append_symbol {
-            Some(get_symbols(self.symbol_set.as_ref().map(String::as_ref)))
+            Some("!\"#$%&'()*+,-./\\:;<=>?@[]^_`{|}~")
+        } else if let Some(ref user_symbols) = self.symbol_set {
+            Some(user_symbols.as_str())
         } else {
             None
         }
@@ -241,11 +244,6 @@ impl Opt {
 
 fn main() {
     let opts: Opt = Opt::from_args();
-
-    // First, check the early bail cases
-    if opts.list_wordlists || opts.print_wordlist {
-        bail("Wordlists aren't supported yet")
-    }
 
     let (min_word, max_word) = opts.word_length_bounds().unwrap_or_else(|err| bail(err));
 
