@@ -8,6 +8,7 @@ edition = "2018"
 structopt = "0.2"
 rand = "0.6"
 phf = "0.7"
+clap= "2.32"
 
 [build-dependencies]
 phf_codegen = { git = "https://github.com/Lucretiel/rust-phf", branch = "display-impl"}

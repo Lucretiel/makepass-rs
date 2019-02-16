@@ -1,35 +1,25 @@
 mod password;
+mod wordlists;
 
 use std::borrow::Cow;
 use std::cmp::{max, min};
-use std::fmt::{Debug, Display};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
 
+use clap;
 use structopt::StructOpt;
 
 use crate::password::Password;
-
-const WORD_LIST: [&str; 16] = [
-    "Apple",
-    "Banana",
-    "Cranberry",
-    "Doughnut",
-    "Elixer",
-    "Fabric",
-    "Gregarious",
-    "Human",
-    "Ignoble",
-    "Juniper",
-    "Kangaroo",
-    "Loup",
-    "Machismo",
-    "Noteriety",
-    "Oragami",
-    "Phobos",
-];
+use crate::wordlists::{WORD_LISTS, WORD_LIST_NAMES};
 
 #[derive(Debug)]
 struct NewlineBehaviorParseError;
+
+impl Display for NewlineBehaviorParseError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str("Invalid pattern for newline behavior")
+    }
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum NewlineBehavior {
@@ -56,63 +46,61 @@ impl FromStr for NewlineBehavior {
 
 /// Help text
 #[derive(Debug, Clone, StructOpt)]
+#[structopt(rename_all = "kebab-case")]
 struct Opt {
     /// The number of words in the password
-    #[structopt(short = "c", long = "word-count", default_value = "4")]
+    #[structopt(short = "c", long, default_value = "4")]
     word_count: u16,
 
     /// The maximum length of the password, in bytes. Defaults to unlimited.
-    #[structopt(short = "l", long = "max-length")]
+    #[structopt(short = "l", long)]
     max_length: Option<usize>,
 
     /// The minimum length of the password, in bytes. Defaults to 24, or MAX_LENGTH,
     /// whichever is lower
-    #[structopt(short = "m", long = "min-length")]
+    #[structopt(short = "m", long)]
     min_length: Option<usize>,
 
     /// Append a random numeral (0-9) to the password. This is the default.
     ///
     /// Overridden by --no-append-numeral
-    #[structopt(short = "n", long = "append-numeral")]
+    #[structopt(long)]
     append_numeral: bool,
 
     /// Do not append a numeral to the password.
     ///
     /// Overridden by --append-numeral
-    #[structopt(
-        short = "N",
-        long = "no-append-numeral",
-        overrides_with = "append_numeral"
-    )]
+    #[structopt(short = "N", long, overrides_with = "append_numeral")]
     no_append_numeral: bool,
 
     /// Append a random special character to the password.
     ///
     /// Overridden by `--no-append-symbol`. See --symbol-set for the default set of special
     /// characters
-    #[structopt(short = "%", long = "append-symbol")]
+    #[structopt(short = "%", long)]
     append_symbol: bool,
 
     /// Do not append a random special character to the password. This is the default.
     ///
     /// Overridden by --append-symbol and/or --symbol-set.
-    #[structopt(long = "no-append-symbol", overrides_with = "append_symbol")]
+    #[structopt(long, overrides_with = "append_symbol")]
     no_append_symbol: bool,
 
     /// The set of symbols to choose from when appending a random symbol.
     ///
-    /// Implies --append_symbol. Defaults to !"#$%&'()*+,-./\:;<=>?@[]^_`{|}~
-    #[structopt(short = "S", long = "symbol-set", requires = "append_symbol")]
+    /// Implies --append_symbol. Defaults to !"#$%&'()*+,-./\:;<=>?@[]^_`{|}~. If invoking
+    /// from the shell, make sure to properly escape your symbols.
+    #[structopt(short, long, requires = "append_symbol")]
     symbol_set: Option<String>,
 
     /// The minimum length of each individual word in the password, in bytes. Defaults to 4, or
     /// MAX_WORD, whichever is lower.
-    #[structopt(long = "min-word")]
+    #[structopt(long)]
     min_word: Option<usize>,
 
     /// The maximum length of each individual word in the password, in bytes. Defaults to 8, or
     /// MIN_WORD, whichever is higher.
-    #[structopt(long = "max-word")]
+    #[structopt(long)]
     max_word: Option<usize>,
 
     /// The wordlist from which to select words for the password.
@@ -120,22 +108,22 @@ struct Opt {
     /// See --list-wordlist for a list of all available wordlists, and --print-wordlist
     /// for all the words in a given wordlist. This option will also accept "stdin" or "-",
     /// in which case the words will be read (whitespace-separated) from stdin.
-    #[structopt(short = "w", long = "wordlist")]
+    #[structopt(short, long, raw(possible_values = "&WORD_LIST_NAMES"))]
     wordlist: Option<String>,
 
     /// Print the list of available wordlists to stdout, then exit
-    #[structopt(short = "L", long = "list-wordlists")]
+    #[structopt(short = "L", long)]
     list_wordlists: bool,
 
     /// Print a complete wordlist to stdout, then exit
-    #[structopt(short = "p", long = "print-wordlist")]
+    #[structopt(short = "p", long)]
     print_wordlist: bool,
 
     /// The number of passwords to generate when performing entropy estimations.
     ///
     /// Also the number of attempts to create a valid password (for instance, which meets the
     /// length constraints) before giving up.
-    #[structopt(short = "s", long = "sample-size", default_value = "100000")]
+    #[structopt(short="S", long, default_value = "100000")]
     sample_size: usize,
 
     /// Use only the top TOP_WORDS words from the word list (after filtering by size).
@@ -143,62 +131,62 @@ struct Opt {
     /// Using a smaller word list will make your password less secure, but possibly easier to
     /// remember. By default, all word lists are sorted by commonality, with more common words
     /// being near the top.
-    #[structopt(short = "t", long = "top-words")]
+    #[structopt(short, long, value_name = "TOP_WORDS")]
     top_words: Option<usize>,
 
     /// Print an estimate of the password entropy to stderr
-    #[structopt(short = "e", long = "entropy-estimate")]
+    #[structopt(short, long)]
     entropy_estimate: bool,
 
     /// Print the password length (in bytes and code points) to stderr
-    #[structopt(short = "C", long = "show-count")]
+    #[structopt(short = "C", long)]
     show_count: bool,
 
     /// Print entropy estimate calculation details to stderr. Implies --entropy-estimate and
     /// --show-count
-    #[structopt(short = "v", long = "verbose")]
+    #[structopt(short = "v", long)]
     verbose: bool,
 
     /// Trailing newline behavior for the password. If "auto",
     /// a trailing newline will be printed iff stdout is detected to be a tty.
     #[structopt(
-        long = "newline",
+        short = "b",
+        long,
         default_value = "auto",
         possible_value = "never",
         possible_value = "always",
-        possible_value = "auto"
+        possible_value = "auto",
+        value_name = "behavior"
     )]
     newline: NewlineBehavior,
+
+    /// Generate a shell completion file to stdout, then exit.
+    #[structopt(
+        short,
+        long,
+        raw(possible_values = "&clap::Shell::variants()"),
+        value_name = "shell"
+    )]
+    gen_completions: Option<clap::Shell>,
 }
 
+// InvalidBoundsError is an error indicating that a set of bounds couldn't be
+// calculated, because the min was greated than the max
 #[derive(Debug)]
-struct BoundsError {
+struct InvalidBoundsError {
     min: usize,
     max: usize,
 }
 
-#[derive(Debug)]
-enum UsageError {
-    LengthBoundsError(BoundsError),
-    WordBoundsError(BoundsError),
-}
-
 impl Opt {
-    fn length_bounds(&self) -> Result<(usize, Option<usize>), BoundsError> {
+    // Get the user's requests length bounds for the whole password
+    fn length_bounds(&self) -> Result<(usize, Option<usize>), InvalidBoundsError> {
         match (self.min_length, self.max_length) {
             (None, None) => Ok((24, None)),
             (Some(min_length), None) => Ok((min_length, None)),
             (None, Some(max_length)) => Ok((min(24, max_length), Some(max_length))),
-            (Some(min_length), Some(max_length)) => {
-                if min_length > max_length {
-                    Err(BoundsError {
-                        min: min_length,
-                        max: max_length,
-                    })
-                } else {
-                    Ok((min_length, Some(max_length)))
-                }
-            }
+            (Some(min), Some(max)) if min > max => Err(InvalidBoundsError { min, max }),
+            (Some(min), Some(max)) => Ok((min, Some(max))),
         }
     }
 
@@ -219,21 +207,14 @@ impl Opt {
         }
     }
 
-    fn word_length_bounds(&self) -> Result<(usize, usize), BoundsError> {
+    // Get the user's requested length bounds for each word
+    fn word_length_bounds(&self) -> Result<(usize, usize), InvalidBoundsError> {
         match (self.min_word, self.max_word) {
             (None, None) => Ok((4, 8)),
             (Some(min_word), None) => Ok((min_word, max(min_word, 8))),
             (None, Some(max_word)) => Ok((min(4, max_word), max_word)),
-            (Some(min_word), Some(max_word)) => {
-                if min_word > max_word {
-                    Err(BoundsError {
-                        min: min_word,
-                        max: max_word,
-                    })
-                } else {
-                    Ok((min_word, max_word))
-                }
-            }
+            (Some(min), Some(max)) if min > max => Err(InvalidBoundsError { min, max }),
+            (Some(min), Some(max)) => Ok((min, max)),
         }
     }
 
@@ -243,14 +224,6 @@ impl Opt {
 }
 
 fn main() {
-    let opts: Opt = Opt::from_args();
-
-    let (min_word, max_word) = opts.word_length_bounds().unwrap_or_else(|err| bail(err));
-
-    let wordlist: Vec<&str> = WORD_LIST
-        .iter()
-        .map(|word| *word)
-        .filter(|word| word.len() >= min_word && word.len() <= max_word)
-        .take(opts.top_words())
-        .collect();
+    let x: Password;
+    let opts = Opt::from_args();
 }

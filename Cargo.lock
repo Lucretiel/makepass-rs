@@ -82,6 +82,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "makepass"
 version = "0.1.0"
 dependencies = [
+ "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "joinery 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_format 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)",

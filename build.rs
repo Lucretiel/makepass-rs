@@ -27,6 +27,7 @@ fn main() {
 
     let mut file_buffer = String::new();
     let mut map_builder = phf_codegen::Map::new();
+    let mut wordlist_names = Vec::new();
 
     for wordlist_entry in wordlists {
         // TODO: if a wordlist is a symlink to another file in the wordlist dir,
@@ -41,14 +42,14 @@ fn main() {
             _ => continue,
         }
 
-        let wordlist_name = path.file_stem().unwrap().to_str().unwrap();
+        let wordlist_name = path.file_stem().unwrap().to_str().unwrap().to_string();
 
         let mut wordlist = fs::File::open(&path).unwrap();
         file_buffer.clear();
         wordlist.read_to_string(&mut file_buffer).unwrap();
 
         map_builder.entry(
-            wordlist_name.to_string(),
+            wordlist_name.clone(),
             &format!(
                 "&[\n{}\n]",
                 file_buffer
@@ -69,6 +70,8 @@ fn main() {
                     .join_with(",\n")
             ),
         );
+
+        wordlist_names.push(wordlist_name)
     }
 
     let output_file_path = Path::new(&env::var_os("OUT_DIR").unwrap()).join("wordlists_gen.rs");
@@ -76,8 +79,11 @@ fn main() {
 
     write!(
         &mut output_file,
-        "pub static WORD_LISTS: ::phf::Map<&'static str, &'static[&'static str]> = {}\n",
-        &map_builder
+        "pub static WORD_LISTS: ::phf::Map<&'static str, &'static[&'static str]> = {};\n\n\
+         pub static WORD_LIST_NAMES: [&'static str; {}] = {:?};\n\n",
+        &map_builder,
+        wordlist_names.len(),
+        &wordlist_names,
     )
     .unwrap();
 }
