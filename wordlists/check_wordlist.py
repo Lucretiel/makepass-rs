@@ -15,8 +15,10 @@
 # sponge (https://joeyh.name/code/moreutils/) to a wordlist file in-place
 import sys
 
+words = set()
+
 for line_number, line in enumerate(sys.stdin, 1):
-	line = line.strip()
+	line = line.rstrip()
 
 	if line == "":
 		print(line)
@@ -26,10 +28,17 @@ for line_number, line in enumerate(sys.stdin, 1):
 		print(line)
 		continue
 
+	line = line.lstrip()
+
 	# Note: python uses a different definition of "alphabetic" than Rust does. This probably
 	# doesn't matter in practice.
 	if not line.isalpha():
-		print("Non-alphabetic word found on line {}: {}".format(line_number, line))
+		print("Non-alphabetic word found on line {}: {}".format(line_number, line), file=sys.stderr)
 		sys.exit(1)
 
-	print(line.title())
+	line = line.title()
+	if line in words:
+		print("Duplicate word found on line {}: {}".format(line_number, line), file=sys.stderr)
+		sys.exit(1)
+
+	print(line)
