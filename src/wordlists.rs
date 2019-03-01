@@ -23,12 +23,12 @@ impl WordlistStorage {
     pub fn as_wordlist(&self) -> Wordlist {
         match self {
             WordlistStorage::Static(list) => Wordlist::Static(list),
-            WordlistStorage::Runtime(blob) => Wordlist::Runtime(blob
-                .lines()
-                .map(|line| line.trim())
-                .filter(|line| !line.is_empty())
-                .filter(|line| !line.starts_with('#'))
-                .collect()
+            WordlistStorage::Runtime(blob) => Wordlist::Runtime(
+                blob.lines()
+                    .map(|line| line.trim())
+                    .filter(|line| !line.is_empty())
+                    .filter(|line| !line.starts_with('#'))
+                    .collect(),
             ),
         }
     }
@@ -48,7 +48,7 @@ impl<'a> Wordlist<'a> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&str> {
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
         self.as_slice().iter().cloned()
     }
 }

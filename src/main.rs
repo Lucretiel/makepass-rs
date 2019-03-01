@@ -1,23 +1,24 @@
 mod password;
-mod wordlists;
 mod util;
+mod wordlists;
 
-use crate::util::Len;
-use std::iter::FromIterator;
 use std::cmp::{max, min};
+use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-use std::str::FromStr;
-use std::process::exit;
 use std::io::{self, Write};
+use std::iter::FromIterator;
+use std::process::exit;
+use std::str::FromStr;
 
-use structopt::StructOpt;
-use rand::rngs::StdRng;
 use atty;
+use rand::rngs::StdRng;
 use rand::FromEntropy;
+use structopt::StructOpt;
 
 use crate::password::PasswordRules;
-use crate::wordlists::{WORDLIST_NAMES, WordlistStorage};
 use crate::util::Bounds;
+use crate::util::Len;
+use crate::wordlists::{WordlistStorage, WORDLIST_NAMES};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Copy)]
 struct InvalidNewlineBehavior;
@@ -36,7 +37,7 @@ enum NewlineBehavior {
 }
 
 impl NewlineBehavior {
-    fn should_print_newline(&self) -> bool {
+    fn should_print_newline(self) -> bool {
         match self {
             NewlineBehavior::Never => false,
             NewlineBehavior::Always => true,
@@ -69,6 +70,8 @@ impl Display for InvalidWordlistSelection {
         f.write_str("Invalid wordlist selection")
     }
 }
+
+impl Error for InvalidWordlistSelection {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum WordlistSelection {
@@ -145,19 +148,19 @@ struct Opt {
     ///
     /// Implies --append_symbol. Defaults to !"#$%&'()*+,-./\:;<=>?@[]^_`{|}~. If invoking
     /// from the shell, make sure to properly escape your symbols.
-    #[structopt(short, long, requires = "append_symbol", value_name="SYMBOLS")]
+    #[structopt(short, long, requires = "append_symbol", value_name = "SYMBOLS")]
     symbol_set: Option<String>,
 
     /// The minimum length of each individual word in the password, in bytes.
     ///
     /// Defaults to 4, or MAX_WORD, whichever is lower.
-    #[structopt(long, value_name="MIN_WORD_LENGTH")]
+    #[structopt(long, value_name = "MIN_WORD_LENGTH")]
     min_word: Option<usize>,
 
     /// The maximum length of each individual word in the password, in bytes.
     ///
     /// Defaults to 8, or MIN_WORD, whichever is higher.
-    #[structopt(long, value_name="MAX_WORD_LENGTH")]
+    #[structopt(long, value_name = "MAX_WORD_LENGTH")]
     max_word: Option<usize>,
 
     /// The wordlist from which to select words for the password.
@@ -168,11 +171,11 @@ struct Opt {
     #[structopt(
         short,
         long,
-        value_name="WORDLIST",
-        default_value="default",
+        value_name = "WORDLIST",
+        default_value = "default",
         raw(possible_values = "WORDLIST_NAMES"),
-        possible_value="stdin",
-        possible_value="-",
+        possible_value = "stdin",
+        possible_value = "-"
     )]
     wordlist: WordlistSelection,
 
@@ -180,8 +183,9 @@ struct Opt {
     #[structopt(
         short = "L",
         long,
-        conflicts_with="print_wordlist",
-        conflicts_with="print_filtered_wordlist")]
+        conflicts_with = "print_wordlist",
+        conflicts_with = "print_filtered_wordlist"
+    )]
     list_wordlists: bool,
 
     /// Print a complete wordlist to stdout, then exit
@@ -189,7 +193,7 @@ struct Opt {
     print_wordlist: bool,
 
     /// Print the wordlist after the word-length and top-words filters are applied
-    #[structopt(short="P", long)]
+    #[structopt(short = "P", long)]
     print_filtered_wordlist: bool,
 
     /// The number of passwords to generate when performing entropy estimations.
@@ -260,11 +264,20 @@ impl Opt {
     // Get the user's requests length bounds for the whole password
     fn length_bounds(&self) -> Result<Bounds, InvalidBoundsError> {
         match (self.min_length, self.max_length) {
-            (None, None) => Ok(Bounds{min: 24, max: std::usize::MAX}),
-            (Some(min), None) => Ok(Bounds{min, max: std::usize::MAX}),
-            (None, Some(max)) => Ok(Bounds{min: min(24, max), max}),
+            (None, None) => Ok(Bounds {
+                min: 24,
+                max: std::usize::MAX,
+            }),
+            (Some(min), None) => Ok(Bounds {
+                min,
+                max: std::usize::MAX,
+            }),
+            (None, Some(max)) => Ok(Bounds {
+                min: min(24, max),
+                max,
+            }),
             (Some(min), Some(max)) if min > max => Err(InvalidBoundsError { min, max }),
-            (Some(min), Some(max)) => Ok(Bounds{min, max}),
+            (Some(min), Some(max)) => Ok(Bounds { min, max }),
         }
     }
 
@@ -288,11 +301,17 @@ impl Opt {
     // Get the user's requested length bounds for each word
     fn word_length_bounds(&self) -> Result<Bounds, InvalidBoundsError> {
         match (self.min_word, self.max_word) {
-            (None, None) => Ok(Bounds{min: 4, max: 8}),
-            (Some(min), None) => Ok(Bounds{min, max: max(min, 8)}),
-            (None, Some(max)) => Ok(Bounds{min: min(4, max), max}),
+            (None, None) => Ok(Bounds { min: 4, max: 8 }),
+            (Some(min), None) => Ok(Bounds {
+                min,
+                max: max(min, 8),
+            }),
+            (None, Some(max)) => Ok(Bounds {
+                min: min(4, max),
+                max,
+            }),
             (Some(min), Some(max)) if min > max => Err(InvalidBoundsError { min, max }),
-            (Some(min), Some(max)) => Ok(Bounds{min, max}),
+            (Some(min), Some(max)) => Ok(Bounds { min, max }),
         }
     }
 
@@ -312,12 +331,13 @@ fn run(opts: &Opt) -> Result<(), i32> {
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
 
-        return WORDLIST_NAMES.iter().try_for_each(move |name| {
-            writeln!(stdout, "{}", name)
-        }).map_err(|err| {
-            eprintln!("Failed to write to stdout: {}", err);
-            1
-        });
+        return WORDLIST_NAMES
+            .iter()
+            .try_for_each(move |name| writeln!(stdout, "{}", name))
+            .map_err(|err| {
+                eprintln!("Failed to write to stdout: {}", err);
+                1
+            });
     }
 
     let wordlist_storage = match opts.wordlist {
@@ -327,7 +347,7 @@ fn run(opts: &Opt) -> Result<(), i32> {
                 eprintln!("Error reading wordlist from stdin: {}", err);
                 1
             })?
-        },
+        }
         WordlistSelection::Named(ref name) => {
             WordlistStorage::from_name(&name).ok_or_else(|| {
                 eprintln!("No such wordlist {}", name);
@@ -342,20 +362,25 @@ fn run(opts: &Opt) -> Result<(), i32> {
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
 
-        return wordlist.iter().try_for_each(move |word| {
-            writeln!(stdout, "{}", word)
-        }).map_err(|err| {
-            eprintln!("Failed to write to stdout: {}", err);
-            1
-        });
+        return wordlist
+            .iter()
+            .try_for_each(move |word| writeln!(stdout, "{}", word))
+            .map_err(|err| {
+                eprintln!("Failed to write to stdout: {}", err);
+                1
+            });
     }
 
     let word_bounds = opts.word_length_bounds().map_err(|err| {
-        eprintln!("Error: minimum word length {} is greater than maximum word length {}", err.min, err.max);
+        eprintln!(
+            "Error: minimum word length {} is greater than maximum word length {}",
+            err.min, err.max
+        );
         1
     })?;
 
-    let mut filtered_wordlist = wordlist.iter()
+    let mut filtered_wordlist = wordlist
+        .iter()
         .filter(move |word| word_bounds.check_len(word).is_ok())
         .take(opts.top_words());
 
@@ -363,33 +388,40 @@ fn run(opts: &Opt) -> Result<(), i32> {
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
 
-        return filtered_wordlist.try_for_each(move |word| {
-            writeln!(stdout, "{}", word)
-        }).map_err(|err| {
-            eprintln!("Failed to write to stdout: {}", err);
-            1
-        });
+        return filtered_wordlist
+            .try_for_each(move |word| writeln!(stdout, "{}", word))
+            .map_err(|err| {
+                eprintln!("Failed to write to stdout: {}", err);
+                1
+            });
     }
 
     let filtered_wordlist = Vec::from_iter(filtered_wordlist);
-    let password_rules = PasswordRules{
+    let password_rules = PasswordRules {
         wordlist: &filtered_wordlist,
         num_words: opts.word_count as usize,
         append_numeral: opts.should_append_numeral(),
-        append_symbol: opts.append_symbol()
+        append_symbol: opts.append_symbol(),
     };
     let password_bounds = opts.length_bounds().map_err(|err| {
-        eprintln!("Error: minimum password length {} is greater than maximum length {}", err.min, err.max);
+        eprintln!(
+            "Error: minimum password length {} is greater than maximum length {}",
+            err.min, err.max
+        );
         1
     })?;
 
     let mut rng = StdRng::from_entropy();
-    let mut password_stream = password_rules.stream_passwords(&mut rng)
+    let mut password_stream = password_rules
+        .stream_passwords(&mut rng)
         .take(opts.sample_size)
         .filter(move |password| password_bounds.check_len(password).is_ok());
 
     let final_password = password_stream.next().ok_or_else(|| {
-        eprintln!("Couldn't generate any passwords matchings constraints, after {} attempts", opts.sample_size);
+        eprintln!(
+            "Couldn't generate any passwords matchings constraints, after {} attempts",
+            opts.sample_size
+        );
         1
     })?;
 
@@ -405,9 +437,10 @@ fn run(opts: &Opt) -> Result<(), i32> {
         let final_entropy = base_entropy + entropy_adjustment;
 
         if opts.verbose {
-            eprintln!("Generated a password of {word_count} non-repeating words, \
-                from a set of {word_set_size} words of {word_length} bytes each: \
-                {words_entropy:.2} bits of entropy.",
+            eprintln!(
+                "Generated a password of {word_count} non-repeating words, \
+                 from a set of {word_set_size} words of {word_length} bytes each: \
+                 {words_entropy:.2} bits of entropy.",
                 word_count = password_rules.num_words,
                 word_set_size = filtered_wordlist.len(),
                 word_length = word_bounds.display(),
@@ -415,25 +448,28 @@ fn run(opts: &Opt) -> Result<(), i32> {
             );
 
             if password_rules.append_numeral {
-                eprintln!("A random numeral in the range 0-9 was appended, for an \
-                    additional {numeral_entropy:.2} bits of entropy.",
+                eprintln!(
+                    "A random numeral in the range 0-9 was appended, for an \
+                     additional {numeral_entropy:.2} bits of entropy.",
                     numeral_entropy = numeral_entropy,
                 );
             }
 
             if let Some(special_char_set) = password_rules.append_symbol {
-                eprintln!("A random special character from the set {special_chars} \
-                    was appended, for an additional {symbol_entropy:.2} bits of \
-                    entropy",
+                eprintln!(
+                    "A random special character from the set {special_chars} \
+                     was appended, for an additional {symbol_entropy:.2} bits of \
+                     entropy",
                     special_chars = special_char_set,
                     symbol_entropy = symbol_entropy
                 );
             }
 
             if success_size != opts.sample_size {
-                eprintln!("{sample_size} sample passwords were generated, but only {success_size} \
-                    had a length of {password_length} bytes. The entropy estimate was adjusted \
-                    accordingly by {adjust_entropy:.2} bits.",
+                eprintln!(
+                    "{sample_size} sample passwords were generated, but only {success_size} \
+                     had a length of {password_length} bytes. The entropy estimate was adjusted \
+                     accordingly by {adjust_entropy:.2} bits.",
                     sample_size = opts.sample_size,
                     success_size = success_size,
                     password_length = password_bounds.display(),
@@ -442,7 +478,10 @@ fn run(opts: &Opt) -> Result<(), i32> {
             }
         }
 
-        eprintln!("Estimated total password entropy: {entropy:.2} bits.", entropy=final_entropy);
+        eprintln!(
+            "Estimated total password entropy: {entropy:.2} bits.",
+            entropy = final_entropy
+        );
     }
 
     if opts.verbose || opts.show_count {
