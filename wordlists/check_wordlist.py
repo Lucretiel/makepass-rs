@@ -40,5 +40,6 @@ for line_number, line in enumerate(sys.stdin, 1):
 	if line in words:
 		print("Duplicate word found on line {}: {}".format(line_number, line), file=sys.stderr)
 		sys.exit(1)
-
+	
+	words.add(line)
 	print(line)
