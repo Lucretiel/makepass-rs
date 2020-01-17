@@ -1,3 +1,7 @@
+//! Rather than use a (potentially massive) Vec<String> or something like that
+//! we store a runtime wordlist in a single String and generate a Vec<&str> for
+//! it. This reduces allocation pressure and improves memory locality.
+
 use std::io;
 
 include!(concat!(env!("OUT_DIR"), "/wordlists_gen.rs"));
