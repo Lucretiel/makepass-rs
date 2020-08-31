@@ -6,9 +6,10 @@ edition = "2018"
 
 [dependencies]
 structopt = "0.2"
-rand = "0.6"
+rand = "0.7.3"
 clap= "2.32"
 atty = "0.2.11"
+thiserror = "1.0.20"
 
 [build-dependencies]
 joinery = "2.0"

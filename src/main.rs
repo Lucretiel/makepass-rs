@@ -3,8 +3,6 @@ mod util;
 mod wordlists;
 
 use std::cmp::{max, min};
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
 use std::io::{self, Write};
 use std::iter::FromIterator;
 use std::process::exit;
@@ -12,22 +10,18 @@ use std::str::FromStr;
 
 use atty;
 use rand::rngs::StdRng;
-use rand::FromEntropy;
+use rand::SeedableRng;
 use structopt::StructOpt;
+use thiserror::Error;
 
 use crate::password::PasswordRules;
 use crate::util::Bounds;
 use crate::util::Len;
 use crate::wordlists::{WordlistStorage, WORDLIST_NAMES};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Error)]
+#[error("Invalid pattern for newline behavior")]
 struct InvalidNewlineBehavior;
-
-impl Display for InvalidNewlineBehavior {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.write_str("Invalid pattern for newline behavior")
-    }
-}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum NewlineBehavior {
@@ -62,16 +56,9 @@ impl FromStr for NewlineBehavior {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Error)]
+#[error("Invalid wordlist selection")]
 struct InvalidWordlistSelection;
-
-impl Display for InvalidWordlistSelection {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.write_str("Invalid wordlist selection")
-    }
-}
-
-impl Error for InvalidWordlistSelection {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum WordlistSelection {
@@ -148,7 +135,7 @@ struct Opt {
     ///
     /// Implies --append_symbol. Defaults to !"#$%&'()*+,-./\:;<=>?@[]^_`{|}~. If invoking
     /// from the shell, make sure to properly escape your symbols.
-    #[structopt(short, long, requires = "append_symbol", value_name = "SYMBOLS")]
+    #[structopt(short, long, value_name = "SYMBOLS")]
     symbol_set: Option<String>,
 
     /// The minimum length of each individual word in the password, in bytes.
@@ -253,8 +240,9 @@ struct Opt {
 }
 
 // InvalidBoundsError is an error indicating that a set of bounds couldn't be
-// calculated, because the min was greated than the max
-#[derive(Debug)]
+// calculated, because the min was greater than the max
+#[derive(Debug, Clone, Error)]
+#[error("minimum length {min} greater than maximum length {max}")]
 struct InvalidBoundsError {
     min: usize,
     max: usize,
@@ -282,7 +270,7 @@ impl Opt {
     }
 
     fn should_append_numeral(&self) -> bool {
-        // Explaination of logic: if append_numeral is given, it'll override
+        // Explanation of logic: if append_numeral is given, it'll override
         // no_append_numeral. If neither are given, the default is true.
         !self.no_append_numeral
     }
@@ -320,7 +308,28 @@ impl Opt {
     }
 }
 
-fn run(opts: &Opt) -> Result<(), i32> {
+#[derive(Debug, Error)]
+enum MakepassError {
+    #[error("Failed to write to stdout: {0}")]
+    StdoutError(#[source] io::Error),
+
+    #[error("Failed to read wordlist from stdin: {0}")]
+    StdinWordlistError(#[source] io::Error),
+
+    #[error("No such wordlist {0}")]
+    NoSuchWordlist(String),
+
+    #[error("Invalid word length: {0}")]
+    InvalidWordLength(#[source] InvalidBoundsError),
+
+    #[error("Invalid password length: {0}")]
+    InvalidPasswordLength(#[source] InvalidBoundsError),
+
+    #[error("Couldn't generate any passwords matching constraints, after {attempts} attempts")]
+    GenFailure { attempts: usize },
+}
+
+fn run(opts: &Opt) -> Result<(), MakepassError> {
     // Early termination cases
     if let Some(shell) = opts.gen_completions {
         Opt::clap().gen_completions_to("makepass", shell, &mut io::stdout().lock());
@@ -334,27 +343,18 @@ fn run(opts: &Opt) -> Result<(), i32> {
         return WORDLIST_NAMES
             .iter()
             .try_for_each(move |name| writeln!(stdout, "{}", name))
-            .map_err(|err| {
-                eprintln!("Failed to write to stdout: {}", err);
-                1
-            });
+            .map_err(MakepassError::StdoutError);
     }
 
     let wordlist_storage = match opts.wordlist {
         WordlistSelection::Stdin => {
             eprintln!("Reading wordlist from stdin...");
-            WordlistStorage::from_stream(io::stdin().lock()).map_err(|err| {
-                eprintln!("Error reading wordlist from stdin: {}", err);
-                1
-            })?
+            WordlistStorage::from_stream(io::stdin().lock())
+                .map_err(MakepassError::StdinWordlistError)
         }
-        WordlistSelection::Named(ref name) => {
-            WordlistStorage::from_name(&name).ok_or_else(|| {
-                eprintln!("No such wordlist {}", name);
-                1
-            })?
-        }
-    };
+        WordlistSelection::Named(ref name) => WordlistStorage::from_name(name)
+            .ok_or_else(|| MakepassError::NoSuchWordlist(name.clone())),
+    }?;
 
     let wordlist = wordlist_storage.as_wordlist();
 
@@ -365,19 +365,12 @@ fn run(opts: &Opt) -> Result<(), i32> {
         return wordlist
             .iter()
             .try_for_each(move |word| writeln!(stdout, "{}", word))
-            .map_err(|err| {
-                eprintln!("Failed to write to stdout: {}", err);
-                1
-            });
+            .map_err(MakepassError::StdoutError);
     }
 
-    let word_bounds = opts.word_length_bounds().map_err(|err| {
-        eprintln!(
-            "Error: minimum word length {} is greater than maximum word length {}",
-            err.min, err.max
-        );
-        1
-    })?;
+    let word_bounds = opts
+        .word_length_bounds()
+        .map_err(MakepassError::InvalidWordLength)?;
 
     let mut filtered_wordlist = wordlist
         .iter()
@@ -390,10 +383,7 @@ fn run(opts: &Opt) -> Result<(), i32> {
 
         return filtered_wordlist
             .try_for_each(move |word| writeln!(stdout, "{}", word))
-            .map_err(|err| {
-                eprintln!("Failed to write to stdout: {}", err);
-                1
-            });
+            .map_err(MakepassError::StdoutError);
     }
 
     let filtered_wordlist = Vec::from_iter(filtered_wordlist);
@@ -403,13 +393,9 @@ fn run(opts: &Opt) -> Result<(), i32> {
         append_numeral: opts.should_append_numeral(),
         append_symbol: opts.append_symbol(),
     };
-    let password_bounds = opts.length_bounds().map_err(|err| {
-        eprintln!(
-            "Error: minimum password length {} is greater than maximum length {}",
-            err.min, err.max
-        );
-        1
-    })?;
+    let password_bounds = opts
+        .length_bounds()
+        .map_err(MakepassError::InvalidPasswordLength)?;
 
     let mut rng = StdRng::from_entropy();
     let mut password_stream = password_rules
@@ -417,13 +403,11 @@ fn run(opts: &Opt) -> Result<(), i32> {
         .take(opts.sample_size)
         .filter(move |password| password_bounds.check_len(password).is_ok());
 
-    let final_password = password_stream.next().ok_or_else(|| {
-        eprintln!(
-            "Couldn't generate any passwords matchings constraints, after {} attempts",
-            opts.sample_size
-        );
-        1
-    })?;
+    let final_password = password_stream
+        .next()
+        .ok_or_else(|| MakepassError::GenFailure {
+            attempts: opts.sample_size,
+        })?;
 
     if opts.verbose || opts.entropy_estimate {
         let success_size = 1 + password_stream.count();
@@ -503,7 +487,8 @@ fn adjusted_entropy(sample_size: usize, success_size: usize) -> f32 {
 
 fn main() {
     let opts = Opt::from_args();
-    if let Err(code) = run(&opts) {
-        exit(code)
+    if let Err(err) = run(&opts) {
+        eprintln!("{}", err);
+        exit(1);
     }
 }
