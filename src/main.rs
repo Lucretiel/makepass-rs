@@ -2,15 +2,15 @@ mod password;
 mod util;
 mod wordlists;
 
-use std::cmp::{max, min};
-use std::io::{self, Write};
-use std::iter::FromIterator;
-use std::process::exit;
-use std::str::FromStr;
+use std::{
+    cmp::{max, min},
+    io::{self, Write},
+    iter::FromIterator,
+    process::exit,
+    str::FromStr,
+};
 
-use atty;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{rngs::StdRng, SeedableRng};
 use structopt::StructOpt;
 use thiserror::Error;
 
@@ -74,7 +74,7 @@ impl FromStr for WordlistSelection {
 
         if s.eq_ignore_ascii_case("stdin") || s == "-" {
             Ok(WordlistSelection::Stdin)
-        } else if s == "" {
+        } else if s.is_empty() {
             Err(InvalidWordlistSelection)
         } else {
             Ok(WordlistSelection::Named(s.to_lowercase()))
@@ -403,11 +403,9 @@ fn run(opts: &Opt) -> Result<(), MakepassError> {
         .take(opts.sample_size)
         .filter(move |password| password_bounds.check_len(password).is_ok());
 
-    let final_password = password_stream
-        .next()
-        .ok_or_else(|| MakepassError::GenFailure {
-            attempts: opts.sample_size,
-        })?;
+    let final_password = password_stream.next().ok_or(MakepassError::GenFailure {
+        attempts: opts.sample_size,
+    })?;
 
     if opts.verbose || opts.entropy_estimate {
         let success_size = 1 + password_stream.count();
