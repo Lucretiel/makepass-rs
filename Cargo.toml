@@ -1,16 +1,17 @@
 [package]
 name = "makepass"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Nathan West <Lucretiel@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 structopt = "0.2"
-rand = "0.7.3"
-clap= "2.32"
+rand = "0.8.4"
+clap= "2.34"
 atty = "0.2.11"
 thiserror = "1.0.20"
+lazy_format = "2.0.0"
 
 [build-dependencies]
-joinery = "2.0"
-lazy_format = "1.2"
+joinery = "3.1.0"
+lazy_format = "2.0.0"

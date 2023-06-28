@@ -1,4 +1,6 @@
-use std::fmt::{self, Display, Formatter};
+use std::fmt::Display;
+
+use lazy_format::lazy_format;
 
 pub trait Len {
     fn len(&self) -> usize;
@@ -46,23 +48,16 @@ impl Bounds {
     }
 
     /// Write these bounds to a stream, in a format satisying "a length of {} bytes"
-    pub fn display(&self) -> DisplayBounds {
-        DisplayBounds(self)
-    }
-}
+    pub fn display(&self) -> impl Display {
+        let min = self.min;
+        let max = self.max;
 
-///
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct DisplayBounds<'a>(&'a Bounds);
-
-impl<'a> Display for DisplayBounds<'a> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match (self.0.min, self.0.max) {
-            (min, max) if min == max => write!(f, "exactly {}", min),
-            (0, std::usize::MAX) | (1, std::usize::MAX) => f.write_str("any number of"),
-            (0, max) | (1, max) => write!(f, "up to {}", max),
-            (min, std::usize::MAX) => write!(f, "at least {}", min),
-            (min, max) => write!(f, "between {} and {}", min, max),
-        }
+        lazy_format!(match ((min, max)) {
+            (min, max) if min == max => "exactly {min}",
+            (0 | 1, std::usize::MAX) => "any number of",
+            (0 | 1, max) => "up to {max}",
+            (min, std::usize::MAX) => "at least {min}",
+            (min, max) => "between {min} and {max}",
+        })
     }
 }

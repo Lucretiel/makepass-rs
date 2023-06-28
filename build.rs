@@ -5,6 +5,7 @@ use std::fs;
 use std::io::{BufWriter, Read, Write};
 use std::path::Path;
 
+use joinery::separators;
 use joinery::JoinableIterator;
 use lazy_format::lazy_format;
 
@@ -36,7 +37,7 @@ fn main() {
             )
         }));
 
-    write!(&mut output_file, "mod wordlist_content {{\n").unwrap();
+    write!(&mut output_file, "mod wordlist_content {{").unwrap();
 
     for wordlist_entry in wordlists {
         let wordlist_entry = wordlist_entry.unwrap();
@@ -108,7 +109,7 @@ fn main() {
             .enumerate()
             .map(|(ln, line)| (ln, line.trim()))
             .filter(|(_, line)| !line.is_empty())
-            .filter(|(_, line)| !line.starts_with("#"))
+            .filter(|(_, line)| !line.starts_with('#'))
             .inspect(|(line_number, word)| {
                 assert!(
                     word.chars().all(|c| c.is_alphabetic()),
@@ -118,13 +119,13 @@ fn main() {
                     line_number + 1,
                 )
             })
-            .map(|(_, word)| lazy_format!("\t\"{}\"", word))
-            .join_with(",\n");
+            .map(|(_, word)| lazy_format!("\"{}\"", word))
+            .join_with(separators::Comma);
 
         write!(
             &mut output_file,
-            "#[allow(non_upper_case_globals)]\n\
-             pub const {}: &[&str] = &[\n{}\n];\n",
+            "#[allow(non_upper_case_globals)]\
+             pub const {}: &[&str] = &[{}];",
             wordlist_name, array_content
         )
         .unwrap();
@@ -132,18 +133,18 @@ fn main() {
         wordlist_names.push(wordlist_name.to_string());
     }
 
-    write!(&mut output_file, "}} // End of mod wordlist_content\n\n").unwrap();
+    write!(&mut output_file, "}}").unwrap();
 
     wordlist_names.sort();
 
     write!(
         &mut output_file,
-        "pub const WORDLIST_NAMES: &[&str; {}] = &[\n{}\n];\n\n",
+        "pub const WORDLIST_NAMES: &[&str; {}] = &[{}];",
         wordlist_names.len(),
         wordlist_names
             .iter()
-            .map(|name| lazy_format!("\t\"{}\",", name))
-            .join_with("\n"),
+            .map(|name| lazy_format!("\"{}\"", name))
+            .join_with(separators::Comma),
     )
     .unwrap();
 
@@ -153,7 +154,7 @@ fn main() {
         .try_for_each(|name| {
             write!(
                 &mut output_file,
-                "\t\t\"{name}\" => Some(wordlist_content::{name}),\n",
+                "\"{name}\" => Some(wordlist_content::{name}),",
                 name = name
             )
         })

@@ -20,16 +20,11 @@ impl<'a> PasswordRules<'a> {
     }
 
     fn gen_symbol<R: CryptoRng + Rng + ?Sized>(&self, rng: &mut R) -> Option<char> {
-        self.append_symbol
-            .and_then(move |symbol_set| symbol_set.chars().choose(rng))
+        self.append_symbol?.chars().choose(rng)
     }
 
     fn gen_numeral<R: CryptoRng + Rng + ?Sized>(&self, rng: &mut R) -> Option<u8> {
-        if self.append_numeral {
-            Some(rng.gen_range(0, 10))
-        } else {
-            None
-        }
+        self.append_numeral.then(|| rng.gen_range(0..10))
     }
 
     pub fn gen_password<R: CryptoRng + Rng + ?Sized>(&self, rng: &mut R) -> Password<'a> {

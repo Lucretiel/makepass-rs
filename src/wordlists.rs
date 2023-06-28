@@ -47,13 +47,13 @@ pub enum Wordlist<'a> {
 
 impl<'a> Wordlist<'a> {
     pub fn as_slice(&self) -> &[&'a str] {
-        match self {
+        match *self {
             Wordlist::Static(list) => list,
-            Wordlist::Runtime(list) => &list,
+            Wordlist::Runtime(ref list) => list,
         }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &str> {
-        self.as_slice().iter().cloned()
+        self.as_slice().iter().copied()
     }
 }

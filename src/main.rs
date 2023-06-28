@@ -110,6 +110,7 @@ struct Opt {
     ///
     /// Overridden by --no-append-numeral
     #[structopt(long)]
+    #[allow(dead_code)] // We only look at no_append_numeral
     append_numeral: bool,
 
     /// Do not append a numeral to the password.
@@ -129,6 +130,7 @@ struct Opt {
     ///
     /// Overridden by --append-symbol and/or --symbol-set.
     #[structopt(long, overrides_with = "append_symbol")]
+    #[allow(dead_code)] // We only look at append_symbol
     no_append_symbol: bool,
 
     /// The set of symbols to choose from when appending a random symbol.
