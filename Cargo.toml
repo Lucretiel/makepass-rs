@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 structopt = "0.2"
-rand = "0.8.4"
+rand = "0.9.3"
 clap= "2.34"
 atty = "0.2.11"
 thiserror = "1.0.20"
